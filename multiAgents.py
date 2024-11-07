@@ -66,15 +66,51 @@ class ReflexAgent(Agent):
         Print out these variables to see what you're getting, then combine them
         to create a masterful evaluation function.
         """
-        # Useful information you can extract from a GameState (pacman.py)
+        # # Useful information you can extract from a GameState (pacman.py)
+        # successorGameState = currentGameState.generatePacmanSuccessor(action)
+        # newPos = successorGameState.getPacmanPosition()
+        # newFood = successorGameState.getFood()
+        # newGhostStates = successorGameState.getGhostStates()
+        # newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
+
+        # "*** YOUR CODE HERE ***"
+        # return successorGameState.getScore()
+
+          # Generate successor state
         successorGameState = currentGameState.generatePacmanSuccessor(action)
+        
+        # Extract Pacman’s new position, food list, and ghost states
         newPos = successorGameState.getPacmanPosition()
-        newFood = successorGameState.getFood()
+        newFood = successorGameState.getFood().asList()
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
-        "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        # Initialize score from base game score
+        score = successorGameState.getScore()
+        
+        # Factor: Distance to the nearest food
+        if newFood:
+            minFoodDist = min([util.manhattanDistance(newPos, food) for food in newFood])
+            score += 10.0 / minFoodDist  # Higher score for being closer to food
+        
+        # Factor: Ghost distances and scared times
+        for ghostState, scaredTime in zip(newGhostStates, newScaredTimes):
+            ghostPos = ghostState.getPosition()
+            ghostDist = util.manhattanDistance(newPos, ghostPos)
+            
+            # Avoid non-scared ghosts
+            if scaredTime == 0:
+                if ghostDist > 0:
+                    score -= 10.0 / ghostDist  # Higher penalty for being closer to active ghost
+            # Approach scared ghosts
+            else:
+                score += 5.0 / ghostDist  # Reward for being closer to scared ghost
+        
+        # Factor: Fewer remaining food pellets
+        foodLeft = len(newFood)
+        score -= 100 * foodLeft  # Reward having fewer food pellets left
+        
+        return score
 
 def scoreEvaluationFunction(currentGameState):
     """
