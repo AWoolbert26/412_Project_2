@@ -66,49 +66,35 @@ class ReflexAgent(Agent):
         Print out these variables to see what you're getting, then combine them
         to create a masterful evaluation function.
         """
-        # # Useful information you can extract from a GameState (pacman.py)
-        # successorGameState = currentGameState.generatePacmanSuccessor(action)
-        # newPos = successorGameState.getPacmanPosition()
-        # newFood = successorGameState.getFood()
-        # newGhostStates = successorGameState.getGhostStates()
-        # newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
-
-        # "*** YOUR CODE HERE ***"
-        # return successorGameState.getScore()
-
-          # Generate successor state
+ 
         successorGameState = currentGameState.generatePacmanSuccessor(action)
-        
-        # Extract Pacman’s new position, food list, and ghost states
         newPos = successorGameState.getPacmanPosition()
         newFood = successorGameState.getFood().asList()
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
-        # Initialize score from base game score
         score = successorGameState.getScore()
         
-        # Factor: Distance to the nearest food
+        # We want to reward packman for moving towards uneaten food!
         if newFood:
             minFoodDist = min([util.manhattanDistance(newPos, food) for food in newFood])
-            score += 10.0 / minFoodDist  # Higher score for being closer to food
+            score += 10.0 / minFoodDist 
+
+        # We also need to reward the ghost for eating food
+        foodLeft = len(newFood)
+        score -= 50 * foodLeft  
         
-        # Factor: Ghost distances and scared times
+        # Ghosts are a little more complicated. If they are scared we move towards them, if they aren't we move away.
         for ghostState, scaredTime in zip(newGhostStates, newScaredTimes):
             ghostPos = ghostState.getPosition()
             ghostDist = util.manhattanDistance(newPos, ghostPos)
             
-            # Avoid non-scared ghosts
             if scaredTime == 0:
                 if ghostDist > 0:
-                    score -= 10.0 / ghostDist  # Higher penalty for being closer to active ghost
+                    score -= 15.0 / ghostDist 
             # Approach scared ghosts
             else:
-                score += 5.0 / ghostDist  # Reward for being closer to scared ghost
-        
-        # Factor: Fewer remaining food pellets
-        foodLeft = len(newFood)
-        score -= 100 * foodLeft  # Reward having fewer food pellets left
+                score += 5.0 / ghostDist
         
         return score
 
@@ -170,8 +156,51 @@ class MinimaxAgent(MultiAgentSearchAgent):
         gameState.isLose():
         Returns whether or not the game state is a losing state
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        def maxAgent(depth, gameState):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+            
+            legalMoves = gameState.getLegalActions(0)
+            max_val = float('-inf')
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(0, action)
+                score = minAgent(depth, successorState, 1)
+                max_val = max(max_val, score)
+
+            return max_val
+
+        def minAgent(depth, gameState, ghostIndex):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+
+            legalMoves = gameState.getLegalActions(ghostIndex)
+            min_val = float('inf')
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(ghostIndex, action)
+                
+                if ghostIndex < gameState.getNumAgents() - 1:
+                    score = minAgent(depth, successorState, ghostIndex + 1)
+                else:
+                    score = maxAgent(depth + 1, successorState)
+                
+                min_val = min(min_val, score)
+
+            return min_val
+
+        best_score = float('-inf')
+        best_action = None
+        legalMoves = gameState.getLegalActions(0)
+
+        for action in legalMoves:
+            score = minAgent(0, gameState.generateSuccessor(0, action), 1)
+            if score > best_score:
+                best_score = score
+                best_action = action
+
+        return best_action
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -182,8 +211,70 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         """
         Returns the minimax action using self.depth and self.evaluationFunction
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+       
+        def maxAgent(depth, gameState, alpha, beta):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+            
+            legalMoves = gameState.getLegalActions(0)
+            max_val = float('-inf')
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(0, action)
+                score = minAgent(depth, successorState, 1, alpha, beta)
+                max_val = max(max_val, score)
+                if max_val > beta:
+                    return max_val
+
+                alpha = max(max_val, alpha)
+
+            return max_val
+
+        def minAgent(depth, gameState, ghostIndex, alpha, beta):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+
+            legalMoves = gameState.getLegalActions(ghostIndex)
+            min_val = float('inf')
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(ghostIndex, action)
+                
+                if ghostIndex < gameState.getNumAgents() - 1:
+                    score = minAgent(depth, successorState, ghostIndex + 1, alpha, beta)
+                else:
+                    score = maxAgent(depth + 1, successorState, alpha, beta)
+                
+                min_val = min(min_val, score)
+
+                if min_val < alpha:
+                    return min_val
+                
+                beta = min(min_val, beta)
+
+            return min_val
+
+        best_score = float('-inf')
+        best_action = None
+        legalMoves = gameState.getLegalActions(0)
+
+
+        alpha = float('-inf')
+        beta = float('inf')
+        for action in legalMoves:
+            score = minAgent(0, gameState.generateSuccessor(0, action), 1, alpha, beta)
+            if score > best_score:
+                best_score = score
+                best_action = action
+
+            if best_score > beta:
+                    return best_action
+
+            alpha = max(best_score, alpha)
+
+            
+
+        return best_action
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -197,8 +288,52 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         All ghosts should be modeled as choosing uniformly at random from their
         legal moves.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        
+        def maxAgent(depth, gameState):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+            
+            legalMoves = gameState.getLegalActions(0)
+            max_val = float('-inf')
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(0, action)
+                score = randomAgent(depth, successorState, 1)
+                max_val = max(max_val, score)
+
+            return max_val
+
+        def randomAgent(depth, gameState, ghostIndex):
+            if depth == self.depth or gameState.isWin() or gameState.isLose():
+                return self.evaluationFunction(gameState)
+
+            legalMoves = gameState.getLegalActions(ghostIndex)
+            num_moves = len(legalMoves)
+            random_val = 0
+            
+            for action in legalMoves:
+                successorState = gameState.generateSuccessor(ghostIndex, action)
+                
+                if ghostIndex < gameState.getNumAgents() - 1:
+                    score = randomAgent(depth, successorState, ghostIndex + 1)
+                else:
+                    score = maxAgent(depth + 1, successorState)
+                
+                random_val += (1.0 / num_moves) * score
+
+            return random_val
+
+        best_score = float('-inf')
+        best_action = None
+        legalMoves = gameState.getLegalActions(0)
+
+        for action in legalMoves:
+            score = randomAgent(0, gameState.generateSuccessor(0, action), 1)
+            if score > best_score:
+                best_score = score
+                best_action = action
+
+        return best_action
 
 def betterEvaluationFunction(currentGameState):
     """
@@ -208,7 +343,36 @@ def betterEvaluationFunction(currentGameState):
     DESCRIPTION: <write something here so we know what you did>
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+
+    Pos = currentGameState.getPacmanPosition()
+    Food = currentGameState.getFood().asList()
+    GhostStates = currentGameState.getGhostStates()
+    ScaredTimes = [ghostState.scaredTimer for ghostState in GhostStates]
+
+    score = currentGameState.getScore()
+    
+    # We want to reward packman for moving towards uneaten food!
+    if Food:
+        minFoodDist = min([util.manhattanDistance(Pos, food) for food in Food])
+        score += 10.0 / minFoodDist 
+
+    # We also need to reward the ghost for eating food
+    foodLeft = len(Food)
+    score -= 50 * foodLeft  
+    
+    # Ghosts are a little more complicated. If they are scared we move towards them, if they aren't we move away.
+    for ghostState, scaredTime in zip(GhostStates, ScaredTimes):
+        ghostPos = ghostState.getPosition()
+        ghostDist = util.manhattanDistance(Pos, ghostPos)
+        
+        if scaredTime == 0:
+            if ghostDist > 0:
+                score -= 15.0 / ghostDist 
+        # Approach scared ghosts
+        else:
+            score += 5.0 / ghostDist
+    
+    return score
 
 # Abbreviation
 better = betterEvaluationFunction
